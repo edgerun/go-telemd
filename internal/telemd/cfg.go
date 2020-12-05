@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -213,42 +212,4 @@ func execCommand(args string) (string, error) {
 	} else {
 		return strings.TrimSpace(string(output)), nil
 	}
-}
-
-func x86Gpu() ([]string, error) {
-	devices, err := execute("list_gpus")
-	if err != nil {
-		return []string{}, nil
-	}
-
-	return devices, nil
-}
-
-func gpuDevices() map[int]string {
-	arch := runtime.GOARCH
-	var gpus []string
-	var err error
-	if arch == "arm64" {
-		gpus, err = arm64Gpu()
-	} else if arch == "amd64" {
-		gpus, err = x86Gpu()
-	} else {
-		return map[int]string{}
-	}
-
-	if err != nil {
-		log.Fatalln("error fetching gpu devices: ", err.Error())
-		return map[int]string{}
-	}
-
-	devices := map[int]string{}
-
-	for _, gpu := range gpus {
-		split := strings.Split(gpu, "-")
-		id, _ := strconv.Atoi(split[0])
-
-		devices[id] = split[1]
-	}
-
-	return devices
 }

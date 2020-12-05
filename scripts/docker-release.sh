@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-image=edgerun/telemd-gpu
+image=edgerun/telemd
 
 if [[ $1 ]]; then
 	version="$1"
@@ -12,13 +12,13 @@ basetag="${image}:${version}"
 
 # change into project root
 BASE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_ROOT=$(realpath "${BASE}/../../")
+PROJECT_ROOT=$(realpath "${BASE}/../")
 cd $PROJECT_ROOT
 
 # build all the images
-docker build -t ${basetag}-amd64 -f build/package/telemd-gpu/Dockerfile.amd64 .
-docker build -t ${basetag}-arm32v7 -f build/package/telemd-gpu/Dockerfile.arm32v7 .
-docker build -t ${basetag}-aarch64 -f build/package/telemd-gpu/Dockerfile.aarch64 .
+docker build -t ${basetag}-amd64 -f build/package/telemd/Dockerfile.amd64 .
+docker build -t ${basetag}-arm32v7 -f build/package/telemd/Dockerfile.arm32v7 .
+docker build -t ${basetag}-aarch64 -f build/package/telemd/Dockerfile.aarch64 .
 
 # # push em all
 docker push ${basetag}-amd64 &
@@ -36,7 +36,7 @@ docker manifest create ${basetag} \
 	${basetag}-aarch64
 
 # explicit annotations
-docker manifest annotate ${basetag} ${basetag}-arm32v7 --os "linux" --arch "arm" --variant "v7" 
+docker manifest annotate ${basetag} ${basetag}-arm32v7 --os "linux" --arch "arm" --variant "v7"
 
 # ship it
 docker manifest push --purge ${basetag}

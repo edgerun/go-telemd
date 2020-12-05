@@ -51,26 +51,12 @@ type CgroupNetworkInstrument struct {
 	pids map[string]string
 }
 
-type DefaultGpuFrequencyInstrument struct {
-}
+var DisabledInstrument = noopInstrument{}
 
-type Arm64GpuFrequencyInstrument struct {
-	Devices map[int]string
-}
+type noopInstrument struct{}
 
-type X86GpuFrequencyInstrument struct {
-	Devices map[int]string
-}
-
-type DefaultGpuUtilInstrument struct {
-}
-
-type Arm64GpuUtilInstrument struct {
-	Devices map[int]string
-}
-
-type X86GpuUtilInstrument struct {
-	Devices map[int]string
+func (noopInstrument) MeasureAndReport(telem.TelemetryChannel) {
+	// noop
 }
 
 func (CpuUtilInstrument) MeasureAndReport(channel telem.TelemetryChannel) {
@@ -269,107 +255,6 @@ func (instr RamInstrument) MeasureAndReport(channel telem.TelemetryChannel) {
 	channel.Put(telem.NewTelemetry("ram", float64(total-free)))
 }
 
-func (instr Arm64GpuFrequencyInstrument) MeasureAndReport(channel telem.TelemetryChannel) {
-	frequencyInHz, err := readJetsonFrequency()
-	if err != nil {
-		log.Println("Error reading jetson gpu frequency: ", err)
-		return
-	}
-
-	frequencyInMHz := frequencyInHz / (1_000_000)
-	channel.Put(telem.NewTelemetry("gpu_freq"+telem.TopicSeparator+"0", frequencyInMHz))
-}
-
-func (instr X86GpuFrequencyInstrument) MeasureAndReport(channel telem.TelemetryChannel) {
-	var wg sync.WaitGroup
-	wg.Add(len(instr.Devices))
-	defer wg.Wait()
-
-	measureAndReport := func(id int) {
-		defer wg.Done()
-
-		// gpu_freq already returns MHz
-		frequencies, err := execute("gpu_freq", strconv.Itoa(id))
-		if err != nil {
-			log.Println("Error reading gpu measurements", err)
-		}
-
-		if len(frequencies) != 1 {
-			log.Println("Expected 1 cpu freqency measurement but were ", len(frequencies))
-			return
-		}
-
-		//Format: id-name-measure-value
-		values := strings.Split(frequencies[0], "-")
-		frequency, err := strconv.ParseFloat(values[3], 64)
-		if err != nil {
-			log.Println("Expected number from gpu frequency, but got: ", values[3])
-			return
-		}
-
-		channel.Put(telem.NewTelemetry("gpu_freq"+telem.TopicSeparator+strconv.Itoa(id), frequency))
-	}
-
-	for id, _ := range instr.Devices {
-		go measureAndReport(id)
-	}
-}
-
-func (instr DefaultGpuFrequencyInstrument) MeasureAndReport(channel telem.TelemetryChannel) {
-	// per default no gpu support
-}
-
-
-func (instr DefaultGpuUtilInstrument) MeasureAndReport(channel telem.TelemetryChannel) {
-	// per default no gpu support
-}
-
-func (instr Arm64GpuUtilInstrument) MeasureAndReport(channel telem.TelemetryChannel) {
-	gpuUtil, err := readJetsonGpuUtilization()
-	if err != nil {
-		log.Println("Error reading jetson gpu frequency: ", err)
-		return
-	}
-
-	channel.Put(telem.NewTelemetry("gpu_util"+telem.TopicSeparator+"0", gpuUtil))
-}
-
-func (instr X86GpuUtilInstrument) MeasureAndReport(channel telem.TelemetryChannel) {
-	var wg sync.WaitGroup
-	wg.Add(len(instr.Devices))
-	defer wg.Wait()
-
-	measureAndReport := func(id int) {
-		defer wg.Done()
-
-		// gpu_util already returns percentage
-		frequencies, err := execute("gpu_util", strconv.Itoa(id))
-		if err != nil {
-			log.Println("Error reading gpu utilization", err)
-		}
-
-		if len(frequencies) != 1 {
-			log.Println("Expected 1 gpu utilization measurement but were ", len(frequencies))
-			return
-		}
-
-		//Format: id-name-measure-value
-		values := strings.Split(frequencies[0], "-")
-		frequency, err := strconv.ParseFloat(values[3], 64)
-		if err != nil {
-			log.Println("Expected number from gpu_util, but got: ", values[3])
-			return
-		}
-
-		channel.Put(telem.NewTelemetry("gpu_util"+telem.TopicSeparator+strconv.Itoa(id), frequency))
-	}
-
-	for id, _ := range instr.Devices {
-		go measureAndReport(id)
-	}
-}
-
-
 func (CgroupCpuInstrument) MeasureAndReport(channel telem.TelemetryChannel) {
 	dirs := listFilterDir("/sys/fs/cgroup/cpuacct/docker", func(info os.FileInfo) bool {
 		return info.IsDir() && info.Name() != "." && info.Name() != ".."
@@ -460,7 +345,6 @@ func (CgroupBlkioInstrument) MeasureAndReport(channel telem.TelemetryChannel) {
 	}
 }
 
-
 type defaultInstrumentFactory struct{}
 
 type arm32InstrumentFactory struct {
@@ -521,30 +405,6 @@ func (d defaultInstrumentFactory) NewCgroupNetworkInstrument() Instrument {
 	return &CgroupNetworkInstrument{
 		pids: pidMap,
 	}
-}
-
-func (d defaultInstrumentFactory) NewGpuFrequencyInstrument(devices map[int]string) Instrument {
-	return DefaultGpuFrequencyInstrument{}
-}
-
-func (a arm64InstrumentFactory) NewGpuFrequencyInstrument(devices map[int]string) Instrument {
-	return Arm64GpuFrequencyInstrument{devices}
-}
-
-func (x x86InstrumentFactory) NewGpuFrequencyInstrument(devices map[int]string) Instrument {
-	return X86GpuFrequencyInstrument{devices}
-}
-
-func (d defaultInstrumentFactory) NewGpuUtilInstrument(devices map[int]string) Instrument {
-	return DefaultGpuUtilInstrument{}
-}
-
-func (a arm64InstrumentFactory) NewGpuUtilInstrument(devices map[int]string) Instrument {
-	return Arm64GpuUtilInstrument{devices}
-}
-
-func (x x86InstrumentFactory) NewGpuUtilInstrument(devices map[int]string) Instrument {
-	return X86GpuUtilInstrument{devices}
 }
 
 func NewInstrumentFactory(arch string) InstrumentFactory {

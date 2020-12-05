@@ -6,7 +6,7 @@ FROM golang as builder
 
 ADD . /go/src/github.com/edgerun/go-telemd
 WORKDIR /go/src/github.com/edgerun/go-telemd
-RUN CGO_ENABLED=0 GOARCH=arm64 go build -v -o /usr/local/bin/telemd cmd/telemd/main.go
+RUN CGO_ENABLED=0 GOARCH=arm64 go build -tags GPU_SUPPORT -v -o /usr/local/bin/telemd cmd/telemd/main.go
 
 #############
 ### prod ###

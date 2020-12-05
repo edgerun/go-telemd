@@ -50,6 +50,13 @@ func (daemon *Daemon) initInstruments(factory InstrumentFactory) {
 		"cgrp_net":   factory.NewCgroupNetworkInstrument(),
 	}
 
+	// remove instruments that were disabled by the factory
+	for name, instr := range instruments {
+		if instr == DisabledInstrument {
+			delete(instruments, name)
+		}
+	}
+
 	if cfg.Instruments.Disable != nil && (len(cfg.Instruments.Disable) > 0) {
 		log.Println("disabling instruments", cfg.Instruments.Disable)
 		for _, instr := range cfg.Instruments.Disable {
